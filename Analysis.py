@@ -306,6 +306,9 @@ plt.close(f.fig)
 ###Regressions
 #############################################################
 ###Reporting and using rights as dependent variable
+#preparing for logit by creating centered variables
+cols_regression = ["age", "interest", "shaping_space", "use_time_micro", "trust_average", "knowledge_dsa"]
+
 #Creating a data frame with a dummy for used rights
 #Respondents with "prefer not to answer" (numerical value = -3, but data is in list-format) are excluded, since no definite statement can be made about them 
 mask = df["used_rights"].apply(lambda x: -3 in x)
@@ -319,12 +322,26 @@ df_seen_content_dummy = df_used_rights_dummy[~mask2]
 #Creating a data frame with a dummy for reported content
 #Respondents with "prefer not to answer" (numerical value = -3) are excluded, since no definite statement can be made about them
 df_pre_logit = df_seen_content_dummy[df_seen_content_dummy["reported_content"] != -3.0]
+#Centering
+for col in cols_regression:
+    var_name = f"{col}_centered"
+    df_pre_logit[var_name] = (df_pre_logit[col] - df_pre_logit[col].mean())
+    print(f"{var_name} erstellt")
+df_pre_logit["interaction_term"] = (df_pre_logit["knowledge_dsa_centered"]*df_pre_logit["trust_average_centered"])
+
 #For the logit with reported content as dummy variable, only those respondents with seen_content_dummy == 1 are being considered. Seeing illegal content is a necessary condition for reporting illegal content, irrespective the reporting mechanism.
 df_logit = df_pre_logit[df_pre_logit["seen_content_dummy"] == 1]
 df_logit = df_logit[df_logit["gender"] != 4]
+#Re-creating the centered variables, since cases were removed from the dataframe, thereby also impacting the mean values. 
+#creating new interaction term
+for col in cols_regression:
+    var_name = f"{col}_centered"
+    df_logit[var_name] = (df_logit[col] - df_logit[col].mean())
+    print(f"{var_name} erstellt")
+df_logit["interaction_term"] = (df_logit["knowledge_dsa_centered"]*df_logit["trust_average_centered"])
 
 
-X = df_logit[["age", "citizenship", "interest", "gender_female", "knowledge_dsa", "shaping_space", "use_time_micro"]].replace([np.inf, -np.inf], np.nan)
+X = df_logit[["age", "interest", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "interaction_term"]].replace([np.inf, -np.inf], np.nan)
 X = X.fillna(X.mean())
 
 #Reporting content as dependent variable
@@ -333,7 +350,7 @@ y=df_logit["reported_content_dummy"]
 model = sm.Logit(y, X).fit()
 models.append(model)
 
-X = df_pre_logit[["age", "citizenship", "interest", "gender_female", "knowledge_dsa", "shaping_space", "use_time_micro"]].replace([np.inf, -np.inf], np.nan)
+X = df_pre_logit[["age", "interest", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "interaction_term"]].replace([np.inf, -np.inf], np.nan)
 X = X.fillna(X.mean())
 y=df_pre_logit["used_rights_dummy"]
 model = sm.Logit(y, X).fit()
@@ -493,7 +510,9 @@ print(row_count)
 
 
 print(f" DAS TESTET WIEVIEL DAS KORRELIERT: {df[['isced', 'interest']].corr()}")
-
+print(df_logit["reported_content_dummy"].value_counts())
+print(df_pre_logit["used_rights_dummy"].value_counts())
+print(df_pre_logit["knowledge_dsa_centered"].mean())
 '''
 ###TESTSITE
 print((df["knowledge_dsa"].sum())/len(df["knowledge_dsa"]))
