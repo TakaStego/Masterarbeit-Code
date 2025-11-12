@@ -45,6 +45,7 @@ df_rename["used_rights_dummy"] = 1 - df_rename["used_rights_dummy"]
 df_rename["seen_content_dummy"] = 1 - df_rename["seen_content_dummy"]
 df_rename["gender_male"] = (df_rename["gender"] == 1).astype(int)
 df_rename["gender_female"] = (df_rename["gender"] == 2).astype(int)
+df_rename["article_16_dummy"] = df_rename["reported_content"].isin([1, 3])
 
 
 #Removing responses with low quality based on progress, duration and attention check

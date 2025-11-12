@@ -28,7 +28,7 @@ path_data = Path(r"C:\Users\Admin\OneDrive\Desktop\Master\4. Semester\Masterarbe
 
 def latex(filename, dataframe):
     with open(path_lat / filename, "w", encoding="utf-8") as f:
-        f.write(dataframe.round(0).to_latex(float_format="%.0f"))
+        f.write(dataframe.to_latex())
 
 df = pd.read_csv(path_data / "cleaned" / "analysis.csv",
     sep=";")
@@ -321,44 +321,82 @@ df_seen_content_dummy = df_used_rights_dummy[~mask2]
 
 #Creating a data frame with a dummy for reported content
 #Respondents with "prefer not to answer" (numerical value = -3) are excluded, since no definite statement can be made about them
-df_pre_logit = df_seen_content_dummy[df_seen_content_dummy["reported_content"] != -3.0]
+df_pre_logit = df_seen_content_dummy[df_seen_content_dummy["reported_content"] != -3.0].copy()
 #Centering
-for col in cols_regression:
-    var_name = f"{col}_centered"
-    df_pre_logit[var_name] = (df_pre_logit[col] - df_pre_logit[col].mean())
-    print(f"{var_name} erstellt")
+df_pre_logit["knowledge_dsa_centered"] = (df_pre_logit["knowledge_dsa"] - df_pre_logit["knowledge_dsa"].mean())
+df_pre_logit["trust_average_centered"] = (df_pre_logit["trust_average"] - df_pre_logit["trust_average"].mean())
 df_pre_logit["interaction_term"] = (df_pre_logit["knowledge_dsa_centered"]*df_pre_logit["trust_average_centered"])
 
 #For the logit with reported content as dummy variable, only those respondents with seen_content_dummy == 1 are being considered. Seeing illegal content is a necessary condition for reporting illegal content, irrespective the reporting mechanism.
-df_logit = df_pre_logit[df_pre_logit["seen_content_dummy"] == 1]
-df_logit = df_logit[df_logit["gender"] != 4]
+df_logit = df_pre_logit[df_pre_logit["seen_content_dummy"] == 1].copy()
+df_logit = df_logit[df_logit["gender"] != 4].copy()
 #Re-creating the centered variables, since cases were removed from the dataframe, thereby also impacting the mean values. 
 #creating new interaction term
-for col in cols_regression:
-    var_name = f"{col}_centered"
-    df_logit[var_name] = (df_logit[col] - df_logit[col].mean())
-    print(f"{var_name} erstellt")
+df_logit["knowledge_dsa_centered"] = (df_logit["knowledge_dsa"] - df_logit["knowledge_dsa"].mean())
+df_logit["trust_average_centered"] = (df_logit["trust_average"] - df_logit["trust_average"].mean())
 df_logit["interaction_term"] = (df_logit["knowledge_dsa_centered"]*df_logit["trust_average_centered"])
 
-
-X = df_logit[["age", "interest", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "interaction_term"]].replace([np.inf, -np.inf], np.nan)
-X = X.fillna(X.mean())
+###Baseline-model
+X_report1 = df_logit[["age", "interest", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered"]].replace([np.inf, -np.inf], np.nan)
+X_report1 = X_report1.fillna(X_report1.mean())
+X_report1 = sm.add_constant(X_report1, has_constant= "add")
 
 #Reporting content as dependent variable
-models = []
+model1 = []
 y=df_logit["reported_content_dummy"]
-model = sm.Logit(y, X).fit()
-models.append(model)
+model1_report = sm.Logit(y, X_report1).fit()
+model1.append(model1_report)
 
-X = df_pre_logit[["age", "interest", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "interaction_term"]].replace([np.inf, -np.inf], np.nan)
-X = X.fillna(X.mean())
+X_rights1 = df_pre_logit[["age", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered"]].replace([np.inf, -np.inf], np.nan)
+X_rights1 = X_rights1.fillna(X_rights1.mean())
+X_rights1 = sm.add_constant(X_rights1, has_constant= "add")
+
 y=df_pre_logit["used_rights_dummy"]
-model = sm.Logit(y, X).fit()
-models.append(model)
+model1_rights = sm.Logit(y, X_rights1).fit()
+model1.append(model1_rights)
 
-stargazer = Stargazer(models)
-with open(path_lat / "Logit reporting & used rights_new.txt", "w", encoding = "utf-8") as f:
+stargazer = Stargazer(model1)
+with open(path_lat / "Logit reporting & used rights_baseline.txt", "w", encoding = "utf-8") as f:
     f.write(stargazer.render_latex(stargazer))
+
+###Interaction model
+
+X_report = df_logit[["age", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "interaction_term"]].replace([np.inf, -np.inf], np.nan)
+X_report = X_report.fillna(X_report.mean())
+X_report = sm.add_constant(X_report, has_constant= "add")
+
+#Reporting content as dependent variable
+model2 = []
+y=df_logit["reported_content_dummy"]
+model2_report = sm.Logit(y, X_report).fit()
+model2.append(model2_report)
+
+X_rights = df_pre_logit[["age", "interest", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "interaction_term"]].replace([np.inf, -np.inf], np.nan)
+X_rights = X_rights.fillna(X_rights.mean())
+X_rights = sm.add_constant(X_rights, has_constant= "add")
+
+y=df_pre_logit["used_rights_dummy"]
+model2_rights = sm.Logit(y, X_rights).fit()
+model2.append(model2_rights)
+
+stargazer = Stargazer(model2)
+with open(path_lat / "Logit reporting & used rights_interaction.txt", "w", encoding = "utf-8") as f:
+    f.write(stargazer.render_latex(stargazer))
+
+df_cor_report = X_report.drop(columns = "const").corr()
+print(pd.DataFrame(np.linalg.inv(X_report.drop(columns = "const").corr().values), index = df_cor_report.index, columns=df_cor_report.columns))
+multicollinearity_check_report = pd.DataFrame(np.linalg.inv(X_report.drop(columns = "const").corr().values), index = df_cor_report.index, columns=df_cor_report.columns)
+latex("multicollinearity check report.txt", multicollinearity_check_report)
+
+df_cor_rights = X_rights.drop(columns = "const").corr()
+print(pd.DataFrame(np.linalg.inv(X_rights.drop(columns = "const").corr().values), index = df_cor_rights.index, columns=df_cor_rights.columns))
+multicollinearity_check_rights = pd.DataFrame(np.linalg.inv(X_rights.drop(columns = "const").corr().values), index = df_cor_rights.index, columns=df_cor_rights.columns)
+latex("multicollinearity check rights.txt", multicollinearity_check_rights)
+
+ame_rights = model2_rights.get_margeff(at = "overall")
+ame_report = model2_report.get_margeff(at = "overall")
+print(ame_rights.summary())
+print(ame_report.summary())
 
 ###Knowledge about legislation as dependent variable - OLS or Logit?
 
@@ -417,6 +455,10 @@ latex("crosstable used rights & seen content.txt", crosstab_rights_seen)
 crosstab_usetime_knowledge = pd.crosstab(df_use_time_micro_na["use_time_micro"], df_use_time_micro_na["knowledge_dsa_label"])
 crosstab_usetime_knowledge = crosstab_usetime_knowledge[knowledge_order]
 latex("crosstable use time & knowledge.txt", crosstab_usetime_knowledge)
+
+#Crosstable between interest and knowledge of the DSA
+crosstab_interest_knowledge = pd.crosstab(df["knowledge_dsa"], df["interest"])
+latex("crosstable interest & knowledge.txt", crosstab_interest_knowledge)
 
 #Perception of the DSA
 df_perception = pd.DataFrame({"Improving protection": counts_improving_protection, "Worrying": counts_worrying})
@@ -510,9 +552,8 @@ print(row_count)
 
 
 print(f" DAS TESTET WIEVIEL DAS KORRELIERT: {df[['isced', 'interest']].corr()}")
-print(df_logit["reported_content_dummy"].value_counts())
-print(df_pre_logit["used_rights_dummy"].value_counts())
-print(df_pre_logit["knowledge_dsa_centered"].mean())
+print(f"Correlation between knowledge about DSA and interest: {df_logit[["knowledge_dsa", "interest"]].corr()}")
+print(f"Correlation between knowledge about DSA and interest: {df_pre_logit[["knowledge_dsa", "interest"]].corr()}")
 '''
 ###TESTSITE
 print((df["knowledge_dsa"].sum())/len(df["knowledge_dsa"]))
