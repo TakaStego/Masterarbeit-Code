@@ -28,7 +28,7 @@ path_data = Path(r"C:\Users\Admin\OneDrive\Desktop\Master\4. Semester\Masterarbe
 
 def latex(filename, dataframe):
     with open(path_lat / filename, "w", encoding="utf-8") as f:
-        f.write(dataframe.to_latex())
+        f.write(dataframe.to_latex(float_format="%.0f"))
 
 df = pd.read_csv(path_data / "cleaned" / "analysis.csv",
     sep=";")
@@ -66,6 +66,14 @@ knowledge_order = [
     "Very good knowledge"
 ]
 
+interest_order = [
+    "Completely uninterested",
+    "Mostly uninterested",
+    "Indifferent",
+    "Somewhat interested",
+    "Very interested"
+]
+
 # Setting categories
 for col in likert_cols:
     df[col] = pd.Categorical(df[col], categories=likert_order, ordered=True)
@@ -75,7 +83,6 @@ for col in df.columns:
         base = col.replace("_label", "")
         var_name = f"counts_{base}"
         globals()[var_name] = df[col].value_counts()
-        print(f"{var_name} erstellt")
     
 ###Language
 df_language = df["UserLanguage"]
@@ -407,26 +414,55 @@ print(ame_report.summary())
 ###########################################################################################
 ###CREATING OUTPUT IN EXCEL AND LATEX
 ###########################################################################################
-###Latex
+###Counts
+#Gender counts
+latex("Count gender distribution.txt", counts_gender)
+
+#Education
+latex("Counts Education (ISCED-Scale).txt", counts_isced)
+
+#Used rights
+latex("Count used rights.txt", counts_used_rights)
+
+#Seen illegal content
+latex("Count seen illegal content.txt", counts_seen_content)
+
+#Reported illegal content
+latex("Count reported illegal content.txt", counts_reported_content)
+
+#Counts of reported knowledge
+table_knowledge = pd.concat(
+    [
+        counts_knowledge_gdpr.rename("GDPR"),
+        counts_knowledge_ai.rename("AI Act"),
+        counts_knowledge_dsa.rename("DSA"),
+        counts_knowledge_dma.rename("DMA"),
+        counts_knowledge_daa.rename("DAA"),
+        counts_knowledge_tf.rename("Trusted Flaggers"),
+    ],
+    axis=1,
+).fillna(0).reindex(knowledge_order)
+
+latex("Count Knowledge.txt", table_knowledge)
+
+#Count of digital citizenship
+latex("Digital citizenship.txt", counts_citizenship.reindex(likert_order))
+
+#Count of shaping space
+latex("Shaping space.txt", counts_shaping_space.reindex(likert_order))
+
+#Count of the reasons not to report illegal content
+reasons_counts = df_exploded_reasons["labelled_reasons"].value_counts()
+latex("Reasons for not reporting.txt", reasons_counts)
+
+#Perception of the DSA
+df_perception = pd.DataFrame({"Improving protection": counts_improving_protection, "Worrying": counts_worrying})
+latex("Perception of the DSA.txt", df_perception)
+
+###Crosstables
 #Crosstable between daily use time and knowledge
 crosstable_knowledge = pd.crosstab(df_use_time_micro_na["use_time_micro"], df_use_time_micro_na["knowledge_gdpr"])
 latex("test-file.txt", crosstable_knowledge)
-
-#Crosstable between interest and knowledge -- ADAPT TO NOT BE AI KNOWLEDGE - DOES NOT MAKE SENSE
-crosstable_interest = pd.crosstab(df["interest_label"], df["knowledge_ai_label"])
-latex("crosstable test.txt", crosstable_interest)
-
-#Gender counts
-latex("gender distribution.txt", counts_gender)
-
-#Used rights
-latex("used rights.txt", counts_used_rights)
-
-#Seen illegal content
-latex("seen illegal content.txt", counts_seen_content)
-
-#Reported illegal content
-latex("reported illegal content.txt", counts_reported_content)
 
 #Crosstable between people who used their rights and people who made reports
 df_filtered = df_exploded_rights[df_exploded_rights["used_rights"].isin([1, 2])]
@@ -445,9 +481,7 @@ latex("Reporting dummy seen.txt", crosstable_reporting_dummy_seen)
 crosstable_reporting_knowledge = pd.crosstab(df["knowledge_dsa_label"], df["reported_content_label"])
 latex("Reporting knowledge crosstable.txt", crosstable_reporting_knowledge)
 
-#Count of the reasons not to report illegal content
-reasons_counts = df_exploded_reasons["labelled_reasons"].value_counts()
-latex("Reasons for not reporting.txt", reasons_counts)
+
 
 #Crosstable between dummy variable for having used a right under the DSA and seen illegal content
 crosstab_rights_seen = pd.crosstab(df_used_rights_dummy["used_rights_dummy"], df_seen_content_dummy["seen_content_dummy"])
@@ -460,103 +494,14 @@ crosstab_usetime_knowledge = crosstab_usetime_knowledge[knowledge_order]
 latex("crosstable use time & knowledge.txt", crosstab_usetime_knowledge)
 
 #Crosstable between interest and knowledge of the DSA
-crosstab_interest_knowledge = pd.crosstab(df["knowledge_dsa"], df["interest"])
+crosstab_interest_knowledge = pd.crosstab(df["knowledge_dsa_label"], df["interest_label"]).reindex(knowledge_order).reindex(columns = interest_order)
 latex("crosstable interest & knowledge.txt", crosstab_interest_knowledge)
-
-#Perception of the DSA
-df_perception = pd.DataFrame({"Improving protection": counts_improving_protection, "Worrying": counts_worrying})
-latex("Perception of the DSA.txt", df_perception)
-
-###Excel
-#Setting path and creating workbooks
-with pd.ExcelWriter(path_tab / "output.xlsx", engine="xlsxwriter") as writer:
-    
-    #Gender
-    workbook  = writer.book
-    worksheet = workbook.add_worksheet("Gender")
-    writer.sheets["Knowledge"] = worksheet
-    (
-    df["gender_label"]
-      .value_counts()
-      .rename_axis("gender")
-      .reset_index(name="count")
-      .to_excel(writer, sheet_name="Gender", index=False)
-)
-    #Knowledge
-    workbook  = writer.book
-    worksheet = workbook.add_worksheet("Knowledge")
-    writer.sheets["Knowledge"] = worksheet
-    knowledge_cols = {
-    "knowledge_dsa_label": "DSA",
-    "knowledge_dma_label": "DMA",
-    "knowledge_ai_label": "AI Act",
-    "knowledge_gdpr_label": "GDPR",
-    "knowledge_daa_label": "DAA",
-    "knowledge_tf_label": "Trusted Flaggers"
-}
-
-    #Setting a common dataframe for all knowledge values
-    df_out = pd.DataFrame({
-        name: df[col].value_counts()
-        for col, name in knowledge_cols.items()
-    })
-
-    #Setting index for column for knowledge labels
-    df_out = df_out.reset_index().sort_values("DSA").rename(columns={"index": "Knowledge"})
-
-    #Writing knowledge values to Excel
-    df_out.to_excel(writer, sheet_name="Knowledge", index=False)
-
-    #Education
-    workbook  = writer.book
-    worksheet = workbook.add_worksheet("Education")
-    writer.sheets["Education"] = worksheet
-    (
-    df["isced_label"]
-      .value_counts()
-      .reset_index(name="Education")
-      .to_excel(writer, sheet_name="Education", index=False)
-)
-    #Used rights
-    workbook  = writer.book
-    worksheet = workbook.add_worksheet("Used rights")
-    writer.sheets["Used rights"] = worksheet
-    (
-    counts_used_rights
-      .reset_index(name="Used rights")
-      .to_excel(writer, sheet_name="Used rights", index=False)
-)
-    #Digital citizenship
-    workbook  = writer.book
-    worksheet = workbook.add_worksheet("Digital citizenship")
-    writer.sheets["Digital citizenship"] = worksheet
-    (
-    df["citizenship_label"].sort_values()
-      .value_counts()
-      .reindex(likert_order)
-      .to_excel(writer, sheet_name="Digital citizenship", index=True)
-)
-    #Shaping space - Exporting to same sheet as digital citizenship
-    df["shaping_space_label"].value_counts().reindex(likert_order).to_excel(writer, sheet_name = "Digital citizenship", startcol=2, index=True)
-    
-    #Perception of the DSA
-    workbook  = writer.book
-    worksheet = workbook.add_worksheet("Perception of DSA")
-    writer.sheets["Perception of DSA"] = worksheet
-    (
-    df["worrying_label"].sort_values()
-      .value_counts()
-      .reindex(likert_order)
-      .to_excel(writer, sheet_name="Perception of DSA", index=True)
-)
-    df["improving_protection_label"].value_counts().reindex(likert_order).to_excel(writer, sheet_name = "Perception of DSA", startcol=2, index=True)
-
-print(row_count)
-
 
 print(f" DAS TESTET WIEVIEL DAS KORRELIERT: {df[['isced', 'interest']].corr()}")
 print(f"Correlation between knowledge about DSA and interest: {df_model_1[["knowledge_dsa", "interest"]].corr()}")
 print(f"Correlation between knowledge about DSA and interest: {df_model_2[["knowledge_dsa", "interest"]].corr()}")
+df_seen_reported_content = df[df["seen_content_dummy"] == 1]
+print(f"Share of people who reported content who saw illegal content: {(df_seen_reported_content["reported_content_dummy"].sum())/len(df_seen_reported_content)}")
 '''
 ###TESTSITE
 print((df["knowledge_dsa"].sum())/len(df["knowledge_dsa"]))
