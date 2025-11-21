@@ -195,7 +195,7 @@ df_exploded_rights = df.explode("used_rights")
 df_exploded_rights["used_rights_label"] = df_exploded_rights["used_rights"].map(used_rights_map)
 
 #creating and exporting value counts
-counts_used_rights = df_exploded_rights["used_rights"].value_counts()
+counts_used_rights = df_exploded_rights["used_rights_label"].value_counts()
 latex("used rights.txt", counts_used_rights)
 
 ###########################################################################################
@@ -431,22 +431,22 @@ latex("Count seen illegal content.txt", counts_seen_content)
 latex("Count reported illegal content.txt", counts_reported_content)
 
 #Counts of reported knowledge
-table_knowledge = pd.concat(
-    [
-        counts_knowledge_gdpr.rename("GDPR"),
-        counts_knowledge_ai.rename("AI Act"),
-        counts_knowledge_dsa.rename("DSA"),
-        counts_knowledge_dma.rename("DMA"),
-        counts_knowledge_daa.rename("DAA"),
-        counts_knowledge_tf.rename("Trusted Flaggers"),
-    ],
-    axis=1,
-).fillna(0).reindex(knowledge_order)
+table_knowledge = pd.DataFrame({
+    "GDPR": counts_knowledge_gdpr,
+    "AI Act": counts_knowledge_ai,
+    "DSA": counts_knowledge_dsa,
+    "DMA": counts_knowledge_dma,
+    "DAA": counts_knowledge_daa,
+    "Trusted Flaggers": counts_knowledge_tf
+}).fillna(0).reindex(knowledge_order)
+latex("Count Knowledge 2.txt", table_knowledge)
 
-latex("Count Knowledge.txt", table_knowledge)
-
-#Count of digital citizenship
-latex("Digital citizenship.txt", counts_citizenship.reindex(likert_order))
+#Count of digital citizenship & shaping space
+citizenship_perception = pd.DataFrame({
+    "Digital Citizenship": counts_citizenship,
+    "Rights are a possibility to shape the digital space": counts_shaping_space
+}).fillna(0).reindex(likert_order)
+latex("Digital citizenship & shaping space.txt", citizenship_perception)
 
 #Count of shaping space
 latex("Shaping space.txt", counts_shaping_space.reindex(likert_order))
@@ -456,8 +456,11 @@ reasons_counts = df_exploded_reasons["labelled_reasons"].value_counts()
 latex("Reasons for not reporting.txt", reasons_counts)
 
 #Perception of the DSA
-df_perception = pd.DataFrame({"Improving protection": counts_improving_protection, "Worrying": counts_worrying})
-latex("Perception of the DSA.txt", df_perception)
+table_perception = pd.DataFrame({
+    "Improving protection": counts_improving_protection,
+    "Worrying": counts_worrying
+}).reindex(likert_order)
+latex("Perception of the DSA.txt", table_perception)
 
 ###Crosstables
 #Crosstable between daily use time and knowledge
@@ -481,8 +484,6 @@ latex("Reporting dummy seen.txt", crosstable_reporting_dummy_seen)
 crosstable_reporting_knowledge = pd.crosstab(df["knowledge_dsa_label"], df["reported_content_label"])
 latex("Reporting knowledge crosstable.txt", crosstable_reporting_knowledge)
 
-
-
 #Crosstable between dummy variable for having used a right under the DSA and seen illegal content
 crosstab_rights_seen = pd.crosstab(df_used_rights_dummy["used_rights_dummy"], df_seen_content_dummy["seen_content_dummy"])
 print(crosstab_rights_seen)
@@ -497,10 +498,11 @@ latex("crosstable use time & knowledge.txt", crosstab_usetime_knowledge)
 crosstab_interest_knowledge = pd.crosstab(df["knowledge_dsa_label"], df["interest_label"]).reindex(knowledge_order).reindex(columns = interest_order)
 latex("crosstable interest & knowledge.txt", crosstab_interest_knowledge)
 
-print(f" DAS TESTET WIEVIEL DAS KORRELIERT: {df[['isced', 'interest']].corr()}")
+print(f" DAS TESTET WIEVIEL DAS KORRELIERT: {df[["isced", "interest"]].corr()}")
 print(f"Correlation between knowledge about DSA and interest: {df_model_1[["knowledge_dsa", "interest"]].corr()}")
 print(f"Correlation between knowledge about DSA and interest: {df_model_2[["knowledge_dsa", "interest"]].corr()}")
 df_seen_reported_content = df[df["seen_content_dummy"] == 1]
+print(f"correlation between interest and using rights: {df[["used_rights_dummy", "interest"]].corr()}")
 print(f"Share of people who reported content who saw illegal content: {(df_seen_reported_content["reported_content_dummy"].sum())/len(df_seen_reported_content)}")
 '''
 ###TESTSITE

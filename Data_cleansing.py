@@ -170,7 +170,6 @@ reported_content_map = {
 }
 df["reported_content_label"] = df["reported_content"].map(reported_content_map)
 
-
 ###Interest in digital policy
 interest_map = {
     1: "Completely uninterested",
