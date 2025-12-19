@@ -5,6 +5,31 @@ def counting_value():
     for col in df:
         if col is in numeric_cols:
 
+table_vars = [
+    "use_time_micro",
+    "use_time_macro",
+    "activeness",
+    "trust_review"
+    "trust_data",
+    "trust_comply",
+    "trust_remove",
+    "trust_average",
+    "knowledge_gdpr",
+    "knowledge_dsa",
+    "knowledge_tf",
+    "knowledge_dma",
+    "knowledge_ai",
+    "interest",
+    "shaping_space",
+    "citizenship",
+    "improving_protection",
+    "worrying",
+    "isced",
+    "age"
+]
+
+for col in table_vars:
+    df[col] = df[col].describe
 
 #Interest in digital policy
 counts_interest = df["interest_label"].value_counts()

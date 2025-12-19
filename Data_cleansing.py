@@ -6,8 +6,8 @@ import numpy as np
 
 #Loading the raw csv
 df_raw = pd.read_csv(
-    r"C:\Users\Admin\OneDrive\Desktop\Master\4. Semester\Masterarbeit\Data\20251008\20251008.csv",
-    sep=",", on_bad_lines="warn"
+    r"C:\Users\Admin\OneDrive\Desktop\Master\4. Semester\Masterarbeit\Data\20251008\20251008 - Kopie.csv",
+    sep=";", on_bad_lines="warn"
 )
 print(f"Length prior to data cleansing: {len(df_raw)} observations")
 
@@ -37,8 +37,11 @@ for col in numeric_cols:
 
 #Creating dummy variables
 df_rename["reported_content_dummy"] = df_rename["reported_content"].isin([1, 3]).astype(int)
+df_rename.loc[df_rename["reported_content"] == -3, "reported_content_dummy"] = np.nan #setting "prefer not to answer" to none to be not labelled as "No"
 df_rename["used_rights_dummy"] = df_rename["used_rights"].astype(str).isin(["-3", "8"]).astype(int)
+df_rename.loc[df_rename["used_rights"] == -3, "used_rights_dummy"] = np.nan
 df_rename["seen_content_dummy"] = df_rename["seen_content"].astype(str).isin(["-3", "1"]).astype(int)
+df_rename.loc[df_rename["seen_content"] == -3, "seen_content_dummy"] = np.nan
 df_rename["knowledge_dsa_dummy"] = 0
 df_rename["knowledge_dsa_dummy"] = (df_rename["knowledge_dsa"] > 2).astype(int)
 df_rename["used_rights_dummy"] = 1 - df_rename["used_rights_dummy"]
@@ -229,7 +232,7 @@ education_map = {
     2: "Still a pupil",
     3: "Middle School",
     4: "High School",
-    5: "Apprenticeship or vocational training",
+    5: "Apprenticeship or \n vocational training",
     6: "Bachelor´s degree",
     7: "Master´s degree",
     8: "PhD",
@@ -263,7 +266,8 @@ isced_label_map = {
     6: "Bachelor´s or equivalent level",
     7: "Master´s or equivalent level",
     8: "Doctoral or equivalent level",
-    9: "Prefer not to answer"
+    9: "Other (not further specified)",
+    -3: "Prefer not to answer"
 }
 
 df["isced"] = df["education"].map(isced_value_map)
