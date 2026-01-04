@@ -10,38 +10,42 @@
 ###########################################################################################
 
 ###########################################################################################
-###lOADING PACKAGES
+###LOADING PACKAGES
 ###########################################################################################
 import pandas as pd
-from pandas import DataFrame as DF
 import xlsxwriter
 import numpy as np
 import scipy as scipy
-from scipy import stats as stats
-from scipy.stats.distributions import chi2
 import seaborn as sns
-from pathlib import Path
 import matplotlib.pyplot as plt
 import textwrap
 import statsmodels.api as sm 
+from pandas import DataFrame as DF
+from scipy import stats as stats
+from scipy.stats.distributions import chi2
+from pathlib import Path
 from stargazer.stargazer import Stargazer
 from statsmodels.nonparametric.smoothers_lowess import lowess
+from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 ###########################################################################################
 ###IMPORTING DATA (adapt to your file system)
 ###########################################################################################
+#Adapt absolute path to your OS
+path_abs = path_data = Path(r"C:\Users\Admin\OneDrive\Desktop\Master\4. Semester\Masterarbeit")
 
-path_viz = Path(r"C:\Users\Admin\OneDrive\Desktop\Master\4. Semester\Masterarbeit\Data\output\visualizations")
-path_tab = Path(r"C:\Users\Admin\OneDrive\Desktop\Master\4. Semester\Masterarbeit\Data\output\tables")
-path_lat = Path(r"C:\Users\Admin\OneDrive\Desktop\Master\4. Semester\Masterarbeit\Data\output\latex")
-path_data = Path(r"C:\Users\Admin\OneDrive\Desktop\Master\4. Semester\Masterarbeit\Data")
 
-def latex(filename, dataframe):
-    with open(path_lat / filename, "w", encoding="utf-8") as f:
+path_viz = Path(rf"{path_abs}\Data\output\visualizations")
+path_reg = Path(rf"{path_abs}\Data\output\regression")
+path_desc = Path(rf"{path_abs}\Data\output\descriptive")
+path_data = Path(rf"{path_abs}\Data")
+
+def latex(path, filename, dataframe):
+    with open(path / filename, "w", encoding="utf-8") as f:
         f.write(dataframe.to_latex(float_format="%.0f"))
 
-def latex_float(filename, dataframe):
-    with open(path_lat / filename, "w", encoding="utf-8") as f:
+def latex_float(path, filename, dataframe):
+    with open(path / filename, "w", encoding="utf-8") as f:
         f.write(dataframe.to_latex(float_format="%.2f"))
 
 
@@ -99,12 +103,6 @@ for col in df.columns:
         var_name = f"counts_{base}"
         globals()[var_name] = df[col].value_counts()
     
-###Language
-df_language = df["UserLanguage"]
-count_language = df_language.value_counts()
-print(count_language)
-
-
 ###INTERNET USAGE
 ##Used Networks
 ###NETWORKS - IU_1
@@ -138,7 +136,7 @@ df_exploded_networks["networks_numeric"] = df_exploded_networks["used_social_med
 #creating and exporting value counts
 counts_networks = df_exploded_networks["networks_label"].value_counts()
 counts_networks = (counts_networks/row_count)
-latex("used networks.txt", counts_networks)
+latex(path_desc, "used networks.txt", counts_networks)
 
 ###SEEN CONTENT
 seen_content_map = {
@@ -154,19 +152,7 @@ df["seen_content"] = df["seen_content"].apply(safe_split)
 df_exploded_seen_content = df.explode("seen_content")
 df_exploded_seen_content["exploded_seen_content_label"] = df_exploded_seen_content["seen_content"].map(seen_content_map)
 
-#creating and exporting value counts
-counts_seen_content = df_exploded_seen_content["exploded_seen_content_label"].value_counts()
-share_seen_content = (counts_seen_content/row_count)
-print(share_seen_content)
-latex("seen content.txt", counts_seen_content)
-latex("share seen content.txt", share_seen_content)
-
-#Reported content
-counts_reported_content = df["reported_content_label"].value_counts()
-print(counts_reported_content)
-latex("reported content.txt", counts_reported_content)
-
-###REASONS
+###REASONS FOR NOT REPORTING
 reasons_map = {
     1: "Not sure whether content was illegal",
     2: "No knowledge reporting was possible",
@@ -178,7 +164,7 @@ reasons_map = {
     8: "Afraid of negative consequences",
     9: "Other",
    -1: "Don´t know",
-   -2: "Prefer not to answer"
+   -3: "Prefer not to answer"
 }
 
 df["reasons"] = df["reasons"].apply(safe_split)
@@ -186,10 +172,6 @@ df["reasons"] = df["reasons"].apply(safe_split)
 #Exploding and mapping labels
 df_exploded_reasons = df.explode("reasons")
 df_exploded_reasons["labelled_reasons"] = df_exploded_reasons["reasons"].map(reasons_map)
-
-#creating and exporting value coutnts
-counts_reasons = df_exploded_reasons["labelled_reasons"].value_counts()
-latex("reasons to not report.txt", counts_reasons)
 
 ###USED RIGHTS
 used_rights_map = {
@@ -210,9 +192,26 @@ df["used_rights"] = df["used_rights"].apply(safe_split)
 df_exploded_rights = df.explode("used_rights")
 df_exploded_rights["used_rights_label"] = df_exploded_rights["used_rights"].map(used_rights_map)
 
-#creating and exporting value counts
-counts_used_rights = df_exploded_rights["used_rights_label"].value_counts()
-latex("used rights.txt", counts_used_rights)
+
+###REASONS FOR NOT USING RIGHTS
+###REASONS FOR NOT REPORTING
+reasons_rights_map = {
+    1: "Not aware of those rights",
+    2: "Not interested in using rights",
+    3: "Information or tool too hard to find",
+    4: "Did not feel like action would have an impact",
+    5: "Afraid of potential negative consequences",
+    6: "Did not encounter a situation where rights use was necessary",
+    7: "Plan to use those rights in the future",
+    8: "Other",
+   -3: "Prefer not to answer"
+}
+
+df["reasons_rights"] = df["reasons_rights"].apply(safe_split)
+
+#Exploding and mapping labels
+df_exploded_reasons_rights = df.explode("reasons_rights")
+df_exploded_reasons_rights["labelled_reasons_rights"] = df_exploded_reasons_rights["reasons_rights"].map(reasons_rights_map)
 
 ###########################################################################################
 ###DESCRIPTIVE ANALYSIS
@@ -246,7 +245,12 @@ table_vars = [
 df_non_negative = df[~(df[table_vars] < 0).any(axis=1)].copy()
 
 descriptive_table = df_non_negative[table_vars].agg(["median", "std", "min", "max"]).transpose()
-latex_float("descriptive_table.txt", descriptive_table)
+latex_float(path_desc, "descriptive_table.txt", descriptive_table)
+
+###Language
+df_language = df["UserLanguage"]
+count_language = df_language.value_counts()
+latex(path_desc, "Language distribution.txt", count_language)
 
 ###Graphics
 #Setting color palette
@@ -262,8 +266,9 @@ plt.close(fig)
 #Education
 colors = cmap(np.linspace(0, 1, len(counts_education)))
 fig, ax = plt.subplots(figsize = (12,6))
-ax.pie(counts_education.values, labels=counts_education.index, colors=colors)
-plt.savefig(path_viz / "education_counts.jpg")
+ax.pie(counts_education.values, colors=colors)
+ax.legend(labels=counts_education.index, loc=3, bbox_to_anchor=(1.0, 0.5))
+plt.savefig(path_viz / "education_counts.jpg", dpi = 600)
 plt.close(fig)
 
 #Age distribution
@@ -284,14 +289,12 @@ fig, ax =plt.subplots(figsize=(12, 6))
 ax.bar(counts_use_time_micro.index, counts_use_time_micro.values, color = colors)
 fig.savefig(path_viz / "Use time micro.jpg")
 plt.close(fig)
-print(f"Use time micro value counts: {df["use_time_micro_label"].value_counts()}")
 
 #Use time - Macro
 fig, ax =plt.subplots(figsize=(12, 6))
 ax.bar(counts_use_time_macro.index, counts_use_time_macro.values, color = colors)
 fig.savefig(path_viz / "Use time macro.jpg")
 plt.close(fig)
-print(f"Use time macro value counts: {df["use_time_macro_label"].value_counts()}")
 
 ##Knowledge distribution
 #DSA
@@ -331,6 +334,7 @@ fig.savefig(path_viz / "DAA knowledge.jpg")
 plt.close(fig)
 
 ##Seen content
+counts_seen_content = df_exploded_seen_content["exploded_seen_content_label"].value_counts()
 labels_wrapped_content = ['\n'.join(textwrap.wrap(str(label), 20)) for label in counts_seen_content.index]
 fig, ax =plt.subplots(figsize=(12, 6))
 ax.bar(labels_wrapped_content, counts_seen_content.values, color = colors)
@@ -343,16 +347,6 @@ fig, ax = plt.subplots(figsize = (20, 10))
 ax.bar(labels_wrapped_networks, counts_networks.values, color = colors)
 fig.savefig(path_viz / "networks.jpg")
 plt.close(fig)
-
-##############################################################
-###Scatter- and boxplots
-##############################################################
-#Average knowledge over usetime
-df_use_time_micro_na = df[df["use_time_micro"].between(1, 6)].copy()
-f = sns.catplot(data=df[~df["use_time_micro"].isin([-1, -3])], x= "use_time_micro", y="knowledge_average", kind="box")
-f.set_axis_labels("Use time per day", "Average knowledge")
-f.savefig(path_viz / "boxplot_knowledge_usetime.jpg")
-plt.close(f.fig)
 
 #############################################################
 ###REGRESSIONS
@@ -393,8 +387,8 @@ df_model_1["interaction_term"] = (df_model_1["knowledge_dsa_centered"]*df_model_
 #############################
 #MAIN MODEL - EXTENDED MODEL - NO INTERACTION TERM
 #############################
-###Model without interaction term - creating predictor variables, filling nan with 
-X_report = df_model_1[["age", "interest", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "worrying"]].replace([np.inf, -np.inf], np.nan)
+###Model without interaction term - creating predictor variables
+X_report = df_model_1[["age", "interest", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "worrying"]]
 X_report = X_report.fillna(X_report.mean())
 X_report = sm.add_constant(X_report, has_constant= "add")
 
@@ -404,7 +398,7 @@ y=df_model_1["reported_content_dummy"]
 regression_report = sm.Logit(y, X_report).fit()
 regression.append(regression_report)
 
-X_rights = df_model_2[["age", "interest", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "worrying"]].replace([np.inf, -np.inf], np.nan)
+X_rights = df_model_2[["age", "interest", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "worrying"]]
 X_rights = X_rights.fillna(X_rights.mean())
 X_rights = sm.add_constant(X_rights, has_constant= "add")
 
@@ -414,20 +408,20 @@ regression_rights = sm.Logit(y, X_rights).fit()
 regression.append(regression_rights)
 
 stargazer = Stargazer(regression)
-with open(path_lat / "Main Model - No interaction term.txt", "w", encoding = "utf-8") as f:
+with open(path_reg / "Main Model - No interaction term.txt", "w", encoding = "utf-8") as f:
     f.write(stargazer.render_latex(stargazer))
 
 #Controlling the Variation Inflation Index to identify possible multicollinearity issues for Model 1
-df_cor_report = X_report.drop(columns = "const").corr()
-print(pd.DataFrame(np.linalg.inv(X_report.drop(columns = "const").corr().values), index = df_cor_report.index, columns=df_cor_report.columns))
-multicollinearity_check_report = pd.DataFrame(np.linalg.inv(X_report.drop(columns = "const").corr().values), index = df_cor_report.index, columns=df_cor_report.columns)
-latex_float("multicollinearity check report.txt", multicollinearity_check_report)
+vif_report = pd.Series([variance_inflation_factor(X_report.values, i)
+                        for i in range(X_report.shape[1])],
+                        index = X_report.columns)
+latex_float(path_reg, "multicollinearity check report.txt", vif_report)
 
 #Controlling the Variation Inflation Index to identify possible multicollinearity issues for Model 2
-df_cor_rights = X_rights.drop(columns = "const").corr()
-print(pd.DataFrame(np.linalg.inv(X_rights.drop(columns = "const").corr().values), index = df_cor_rights.index, columns=df_cor_rights.columns))
-multicollinearity_check_rights = pd.DataFrame(np.linalg.inv(X_rights.drop(columns = "const").corr().values), index = df_cor_rights.index, columns=df_cor_rights.columns)
-latex_float("multicollinearity check rights.txt", multicollinearity_check_rights)
+vif_rights = pd.Series([variance_inflation_factor(X_rights.values, i)
+                        for i in range(X_rights.shape[1])],
+                        index = X_rights.columns)
+latex_float(path_reg, "multicollinearity check rights.txt", vif_rights)
 
 #Calculating Average Marginal Effects
 ame_rights = regression_rights.get_margeff(at = "overall")
@@ -438,6 +432,35 @@ print(ame_report.summary())
 ##############################################
 ###APPENDIX - Supplementary MODELS
 ##############################################
+#############################
+#Main Model - excluding interest to check for possible ommission
+#############################
+#Model creation - incl. interaction term
+X_report_interaction = df_model_1[["age", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "interaction_term", "worrying"]].replace([np.inf, -np.inf], np.nan)
+X_report_interaction = X_report_interaction.fillna(X_report_interaction.mean())
+X_report_interaction = sm.add_constant(X_report_interaction, has_constant= "add")
+
+#Model creation 1- Reporting content as dependent variable
+regression_interaction = []
+y=df_model_1["reported_content_dummy"]
+model2_report = sm.Logit(y, X_report_interaction).fit()
+regression_interaction.append(model2_report)
+
+X_rights_interaction = df_model_2[["age", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "interaction_term", "worrying"]].replace([np.inf, -np.inf], np.nan)
+X_rights_interaction = X_rights_interaction.fillna(X_rights_interaction.mean())
+X_rights_interaction = sm.add_constant(X_rights_interaction, has_constant= "add")
+
+#Model creation 2 - Used rights as dependent variable
+y=df_model_2["used_rights_dummy"]
+model2_rights = sm.Logit(y, X_rights_interaction).fit()
+regression_interaction.append(model2_rights)
+
+stargazer = Stargazer(regression_interaction)
+with open(path_reg / "Omission of interest.txt", "w", encoding = "utf-8") as f:
+    f.write(stargazer.render_latex(stargazer))
+
+
+
 #############################
 #Extended model - seeing oneself as digital citizen instead of shaping space as IV
 #############################
@@ -462,7 +485,7 @@ regression_rights_citizenship = sm.Logit(y, X_rights_citizenship).fit()
 regression_citizenship.append(regression_rights_citizenship)
 
 stargazer = Stargazer(regression_citizenship)
-with open(path_lat / "Main Model - Citizenship.txt", "w", encoding = "utf-8") as f:
+with open(path_reg / "Main Model - Citizenship.txt", "w", encoding = "utf-8") as f:
     f.write(stargazer.render_latex(stargazer))
 
 ##############################################
@@ -489,7 +512,7 @@ model2_rights = sm.Logit(y, X_rights_interaction).fit()
 regression_interaction.append(model2_rights)
 
 stargazer = Stargazer(regression_interaction)
-with open(path_lat / "Logistic regression - Extended Model.txt", "w", encoding = "utf-8") as f:
+with open(path_reg / "Logistic regression - Extended Model.txt", "w", encoding = "utf-8") as f:
     f.write(stargazer.render_latex(stargazer))
 
 
@@ -516,7 +539,7 @@ model1_rights = sm.Logit(y, X_rights_reduced).fit()
 regression_reduced.append(model1_rights)
 
 stargazer = Stargazer(regression_reduced)
-with open(path_lat / "Logistic regression - Reduced model.txt", "w", encoding = "utf-8") as f:
+with open(path_reg / "Logistic regression - Reduced model.txt", "w", encoding = "utf-8") as f:
     f.write(stargazer.render_latex(stargazer))
 
 #############################
@@ -543,28 +566,32 @@ model1_rights = sm.Logit(y, X_rights_improving).fit()
 regression_improving.append(model1_rights)
 
 stargazer = Stargazer(regression_improving)
-with open(path_lat / "Logistic regression - Improving protection.txt", "w", encoding = "utf-8") as f:
+with open(path_reg / "Logistic regression - Improving protection.txt", "w", encoding = "utf-8") as f:
     f.write(stargazer.render_latex(stargazer))
 
 
 ###########################################################################################
-###CREATING OUTPUT IN EXCEL AND LATEX
+###CREATING OUTPUT FOR LATEX
 ###########################################################################################
 ###Counts
 #Gender counts
-latex("Count gender distribution.txt", counts_gender)
+latex(path_desc, "Count gender distribution.txt", counts_gender)
 
 #Education
-latex("Counts Education (ISCED-Scale).txt", counts_isced)
+latex(path_desc, "Counts Education (ISCED-Scale).txt", counts_isced)
 
 #Used rights
-latex("Count used rights.txt", counts_used_rights)
+counts_used_rights = df_exploded_rights["used_rights_label"].value_counts()
+latex(path_desc, "Count used rights.txt", counts_used_rights)
 
 #Seen illegal content
-latex("Count seen illegal content.txt", counts_seen_content)
+latex(path_desc, "Count seen illegal content.txt", counts_seen_content)
+share_seen_content = (counts_seen_content/row_count)
+latex(path_desc, "share seen content.txt", share_seen_content)
 
 #Reported illegal content
-latex("Count reported illegal content.txt", counts_reported_content)
+counts_reported_content = df["reported_content_label"].value_counts()
+latex(path_desc, "Counts reported illegal content.txt", counts_reported_content)
 
 #Counts of reported knowledge
 table_knowledge = pd.DataFrame({
@@ -575,72 +602,78 @@ table_knowledge = pd.DataFrame({
     "DAA": counts_knowledge_daa,
     "Trusted Flaggers": counts_knowledge_tf
 }).fillna(0).reindex(knowledge_order)
-latex("Count Knowledge 2.txt", table_knowledge)
+latex(path_desc, "Count Knowledge 2.txt", table_knowledge)
 
 #Count of digital citizenship & shaping space
 citizenship_perception = pd.DataFrame({
     "Digital Citizenship": counts_citizenship,
     "Rights are a possibility to shape the digital space": counts_shaping_space
 }).fillna(0).reindex(likert_order)
-latex("Digital citizenship & shaping space.txt", citizenship_perception)
+latex(path_desc, "Digital citizenship & shaping space.txt", citizenship_perception)
 
 #Count of shaping space
-latex("Shaping space.txt", counts_shaping_space.reindex(likert_order))
+latex(path_desc, "Shaping space.txt", counts_shaping_space.reindex(likert_order))
 
 #Count of the reasons not to report illegal content
 reasons_counts = df_exploded_reasons["labelled_reasons"].value_counts()
-latex("Reasons for not reporting.txt", reasons_counts)
+latex(path_desc, "Reasons for not reporting.txt", reasons_counts)
 print(f"Number of people who gave reasons for not reporting when they saw illegal content: {df["reasons"].notna().sum()}")
+
+#Count of the reasons not to make use of rights
+reasons_rights_counts = df_exploded_reasons_rights["labelled_reasons_rights"].value_counts()
+latex(path_desc, "Reasons for not using rights.txt", reasons_rights_counts)
+print(f"Number of people who gave reasons for not using rights under the DSA: {df["reasons_rights"].notna().sum()}")
 
 #Perception of the DSA
 table_perception = pd.DataFrame({
     "Improving protection": counts_improving_protection,
     "Worrying": counts_worrying
 }).reindex(likert_order)
-latex("Perception of the DSA.txt", table_perception)
+latex(path_desc, "Perception of the DSA.txt", table_perception)
 
 ###Crosstables
 #Crosstable between daily use time and knowledge
+df_use_time_micro_na = df[df["use_time_micro"].between(1, 6)].copy()
 crosstable_knowledge = pd.crosstab(df_use_time_micro_na["use_time_micro"], df_use_time_micro_na["knowledge_gdpr"])
-latex("test-file.txt", crosstable_knowledge)
+latex(path_desc, "Crosstable knowledge & daily use time.txt", crosstable_knowledge)
 
 #Crosstable between people who used their rights and people who made reports
 df_filtered = df_exploded_rights[df_exploded_rights["used_rights"].isin([1, 2])]
 crosstable_reports = pd.crosstab(df_filtered["used_rights_label"], df_filtered["reported_content_label"], margins=True)
-latex("reporting crosstable.txt", crosstable_reports)
+latex(path_desc, "reporting crosstable.txt", crosstable_reports)
 
 #Crosstable between people who have seen illegal content and who reported content
 df_exploded_seen_content_na = df_exploded_seen_content[df_exploded_seen_content["reported_content_label"] != "-3"]
 crosstable_reporting_seen = pd.crosstab(df_exploded_seen_content_na["exploded_seen_content_label"], df_exploded_seen_content_na["reported_content_label"])
-latex("Reporting seen content.txt", crosstable_reporting_seen)
+latex(path_desc, "Reporting seen content.txt", crosstable_reporting_seen)
 
 crosstable_reporting_dummy_seen = pd.crosstab(df_exploded_seen_content["exploded_seen_content_label"], df_exploded_seen_content["reported_content_dummy"])
-latex("Reporting dummy seen.txt", crosstable_reporting_dummy_seen)
+latex(path_desc, "Reporting dummy seen.txt", crosstable_reporting_dummy_seen)
 
 #Crosstable between knowledge about the DSA and reporting
 crosstable_reporting_knowledge = pd.crosstab(df["knowledge_dsa_label"], df["reported_content_label"])
-latex("Reporting knowledge crosstable.txt", crosstable_reporting_knowledge)
+latex(path_desc, "Reporting knowledge crosstable.txt", crosstable_reporting_knowledge)
 
 #Crosstable between dummy variable for having used a right under the DSA and seen illegal content
 crosstab_rights_seen = pd.crosstab(df_used_rights_dummy["used_rights_dummy"], df_seen_content_dummy["seen_content_dummy"])
 print(crosstab_rights_seen)
-latex("crosstable used rights & seen content.txt", crosstab_rights_seen)
+latex(path_desc, "crosstable used rights & seen content.txt", crosstab_rights_seen)
 
 #Crosstable between daily use time and knowledge of the DSA
 crosstab_usetime_knowledge = pd.crosstab(df_use_time_micro_na["use_time_micro"], df_use_time_micro_na["knowledge_dsa_label"])
 crosstab_usetime_knowledge = crosstab_usetime_knowledge[knowledge_order]
-latex("crosstable use time & knowledge.txt", crosstab_usetime_knowledge)
+latex(path_desc, "crosstable use time & knowledge.txt", crosstab_usetime_knowledge)
 
 #Crosstable between interest and knowledge of the DSA
 crosstab_interest_knowledge = pd.crosstab(df["knowledge_dsa_label"], df["interest_label"]).reindex(knowledge_order).reindex(columns = interest_order)
-latex("crosstable interest & knowledge.txt", crosstab_interest_knowledge)
+latex(path_desc, "crosstable interest & knowledge.txt", crosstab_interest_knowledge)
 
-print(f" DAS TESTET WIEVIEL DAS KORRELIERT: {df[["isced", "interest"]].corr()}")
+print(f" Correlation between education and interest: {df[["isced", "interest"]].corr()}")
 print(f"Correlation between knowledge about DSA and interest: {df_model_1[["knowledge_dsa", "interest"]].corr()}")
 print(f"Correlation between trust and interest: {df_model_2[["trust_average", "interest"]].corr()}")
 df_seen_reported_content = df[df["seen_content_dummy"] == 1]
 print(f"correlation between interest and using rights: {df[["used_rights_dummy", "interest"]].corr()}")
-print(f"Share of people who reported content who saw illegal content: {(df_seen_reported_content["reported_content_dummy"].sum())/len(df_seen_reported_content)}")
+print(f"Share of people who reported content upon seeing illegal content: {(df_seen_reported_content["reported_content_dummy"].sum())/len(df_seen_reported_content)}")
 print(f"Median duration: {df["Duration (in seconds)"].median()}")
 print(len(df_used_rights_dummy))
 print(f"Number of people who used more than 1 right: {df_used_rights_dummy["used_rights"].astype(str).str.contains(',').sum()}")
