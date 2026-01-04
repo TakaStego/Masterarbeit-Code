@@ -436,26 +436,26 @@ print(ame_report.summary())
 #Main Model - excluding interest to check for possible ommission
 #############################
 #Model creation - incl. interaction term
-X_report_interaction = df_model_1[["age", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "interaction_term", "worrying"]].replace([np.inf, -np.inf], np.nan)
-X_report_interaction = X_report_interaction.fillna(X_report_interaction.mean())
-X_report_interaction = sm.add_constant(X_report_interaction, has_constant= "add")
+X_report_omission = df_model_1[["age", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "worrying"]]
+X_report_omission = X_report_omission.fillna(X_report_omission.mean())
+X_report_omission = sm.add_constant(X_report_omission, has_constant= "add")
 
 #Model creation 1- Reporting content as dependent variable
-regression_interaction = []
+regression_omission = []
 y=df_model_1["reported_content_dummy"]
-model2_report = sm.Logit(y, X_report_interaction).fit()
-regression_interaction.append(model2_report)
+omission_report = sm.Logit(y, X_report_omission).fit()
+regression_omission.append(omission_report)
 
-X_rights_interaction = df_model_2[["age", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "interaction_term", "worrying"]].replace([np.inf, -np.inf], np.nan)
-X_rights_interaction = X_rights_interaction.fillna(X_rights_interaction.mean())
-X_rights_interaction = sm.add_constant(X_rights_interaction, has_constant= "add")
+X_rights_omission = df_model_2[["age", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "worrying"]]
+X_rights_omission = X_rights_omission.fillna(X_rights_omission.mean())
+X_rights_omission = sm.add_constant(X_rights_omission, has_constant= "add")
 
 #Model creation 2 - Used rights as dependent variable
 y=df_model_2["used_rights_dummy"]
-model2_rights = sm.Logit(y, X_rights_interaction).fit()
-regression_interaction.append(model2_rights)
+omission_rights = sm.Logit(y, X_rights_omission).fit()
+regression_omission.append(omission_rights)
 
-stargazer = Stargazer(regression_interaction)
+stargazer = Stargazer(regression_omission)
 with open(path_reg / "Omission of interest.txt", "w", encoding = "utf-8") as f:
     f.write(stargazer.render_latex(stargazer))
 
@@ -617,7 +617,7 @@ latex(path_desc, "Shaping space.txt", counts_shaping_space.reindex(likert_order)
 #Count of the reasons not to report illegal content
 reasons_counts = df_exploded_reasons["labelled_reasons"].value_counts()
 latex(path_desc, "Reasons for not reporting.txt", reasons_counts)
-print(f"Number of people who gave reasons for not reporting when they saw illegal content: {df["reasons"].notna().sum()}")
+print(f"Number of people who gave reasons for not reporting when they saw illegal content: {df["reasons"].notnull().sum()}")
 
 #Count of the reasons not to make use of rights
 reasons_rights_counts = df_exploded_reasons_rights["labelled_reasons_rights"].value_counts()
