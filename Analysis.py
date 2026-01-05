@@ -354,29 +354,19 @@ plt.close(fig)
 #############################
 #Creating data frames
 #############################
-#Creating a data frame with a dummy for used rights
-#Respondents with "prefer not to answer" (numerical value = -3, but data is in list-format) are excluded, since no definite statement can be made about them 
-mask = df["used_rights"].apply(lambda x: -3 in x)
-df_used_rights_dummy = df[~mask]
-
-#Creating a data frame with a dummy for used rights
-#Respondents with "prefer not to answer" (numerical value = -3, but data is in list-format) are excluded, since no definite statement can be made about them.
-mask2 = df_used_rights_dummy["seen_content"].apply(lambda x: -3 in x)
-df_seen_content_dummy = df_used_rights_dummy[~mask2]
-
 #Creating a data frame with a dummy for reported content
-#Respondents with "prefer not to answer" (numerical value = -3) are excluded, since no definite statement can be made about them
-df_model_2 = df_seen_content_dummy[df_seen_content_dummy["reported_content"] != -3.0].copy()
-
-#Centering the knowledge- and trust variable and creating an interaction term. Model 2 is the model with using rights as DV.
-df_model_2["knowledge_dsa_centered"] = (df_model_2["knowledge_dsa"] - df_model_2["knowledge_dsa"].mean())
-df_model_2["trust_average_centered"] = (df_model_2["trust_average"] - df_model_2["trust_average"].mean())
-df_model_2["interaction_term"] = (df_model_2["knowledge_dsa_centered"]*df_model_2["trust_average_centered"])
+#Respondents with "prefer not to answer" (numerical value = -3, but data is in list-format) are excluded, since no definite statement can be made about them.
+mask = df["reported_content"] == -3
+df_model_1 = df[~mask]
 
 #For the logit with reported content as dummy variable, only those respondents with seen_content_dummy == 1 are being considered. Seeing illegal content is a necessary condition for reporting illegal content, irrespective the reporting mechanism.
-#;odel 1 is the model with reporting dummy as DV.
-df_model_1 = df_model_2[df_model_2["seen_content_dummy"] == 1].copy()
-df_model_1 = df_model_1[df_model_1["gender"] != 4].copy()
+#Model 1 is the model with reporting dummy as DV.
+df_model_1 = df_model_1[df_model_1["seen_content_dummy"] == 1].copy()
+
+#Creating a data frame with a dummy for used rights
+#Respondents with "prefer not to answer" (numerical value = -3, but data is in list-format) are excluded, since no definite statement can be made about them 
+mask2 = df["used_rights"].apply(lambda x: -3 in x)
+df_model_2 = df[~mask2]
 
 #Re-creating the centered variables, since cases were removed from the dataframe, thereby also impacting the mean values. 
 #creating new interaction term
@@ -384,12 +374,18 @@ df_model_1["knowledge_dsa_centered"] = (df_model_1["knowledge_dsa"] - df_model_1
 df_model_1["trust_average_centered"] = (df_model_1["trust_average"] - df_model_1["trust_average"].mean())
 df_model_1["interaction_term"] = (df_model_1["knowledge_dsa_centered"]*df_model_1["trust_average_centered"])
 
+#Centering the knowledge- and trust variable and creating an interaction term. Model 2 is the model with using rights as DV.
+df_model_2["knowledge_dsa_centered"] = (df_model_2["knowledge_dsa"] - df_model_2["knowledge_dsa"].mean())
+df_model_2["trust_average_centered"] = (df_model_2["trust_average"] - df_model_2["trust_average"].mean())
+df_model_2["interaction_term"] = (df_model_2["knowledge_dsa_centered"]*df_model_2["trust_average_centered"])
+
 #############################
 #MAIN MODEL - EXTENDED MODEL - NO INTERACTION TERM
 #############################
 ###Model without interaction term - creating predictor variables
 X_report = df_model_1[["age", "interest", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "worrying"]]
-X_report = X_report.fillna(X_report.mean())
+print(f"so viele nans sind hier drin: {X_report.isna().sum()}")
+X_report = X_report.fillna(X_report.median())
 X_report = sm.add_constant(X_report, has_constant= "add")
 
 #Model construction 1 - Reporting content as DV
@@ -399,7 +395,7 @@ regression_report = sm.Logit(y, X_report).fit()
 regression.append(regression_report)
 
 X_rights = df_model_2[["age", "interest", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "worrying"]]
-X_rights = X_rights.fillna(X_rights.mean())
+X_rights = X_rights.fillna(X_rights.median())
 X_rights = sm.add_constant(X_rights, has_constant= "add")
 
 #Model construction 2 - Used rights as DV
@@ -408,7 +404,7 @@ regression_rights = sm.Logit(y, X_rights).fit()
 regression.append(regression_rights)
 
 stargazer = Stargazer(regression)
-with open(path_reg / "Main Model - No interaction term.txt", "w", encoding = "utf-8") as f:
+with open(path_reg / "Main Model.txt", "w", encoding = "utf-8") as f:
     f.write(stargazer.render_latex(stargazer))
 
 #Controlling the Variation Inflation Index to identify possible multicollinearity issues for Model 1
@@ -426,8 +422,8 @@ latex_float(path_reg, "multicollinearity check rights.txt", vif_rights)
 #Calculating Average Marginal Effects
 ame_rights = regression_rights.get_margeff(at = "overall")
 ame_report = regression_report.get_margeff(at = "overall")
-print(ame_rights.summary())
-print(ame_report.summary())
+print(f"AMEs for using rights:{ame_rights.summary()}")
+print(f"AMEs for reporting content: {ame_report.summary()}")
 
 ##############################################
 ###APPENDIX - Supplementary MODELS
@@ -437,7 +433,7 @@ print(ame_report.summary())
 #############################
 #Model creation - incl. interaction term
 X_report_omission = df_model_1[["age", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "worrying"]]
-X_report_omission = X_report_omission.fillna(X_report_omission.mean())
+X_report_omission = X_report_omission.fillna(X_report_omission.median())
 X_report_omission = sm.add_constant(X_report_omission, has_constant= "add")
 
 #Model creation 1- Reporting content as dependent variable
@@ -447,7 +443,7 @@ omission_report = sm.Logit(y, X_report_omission).fit()
 regression_omission.append(omission_report)
 
 X_rights_omission = df_model_2[["age", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "worrying"]]
-X_rights_omission = X_rights_omission.fillna(X_rights_omission.mean())
+X_rights_omission = X_rights_omission.fillna(X_rights_omission.median())
 X_rights_omission = sm.add_constant(X_rights_omission, has_constant= "add")
 
 #Model creation 2 - Used rights as dependent variable
@@ -460,13 +456,12 @@ with open(path_reg / "Omission of interest.txt", "w", encoding = "utf-8") as f:
     f.write(stargazer.render_latex(stargazer))
 
 
-
 #############################
-#Extended model - seeing oneself as digital citizen instead of shaping space as IV
+#Main Model - seeing oneself as digital citizen instead of shaping space as IV
 #############################
 ###Model without interaction term - creating predictor variables, filling nan with 
-X_report_citizenship = df_model_1[["age", "interest", "citizenship", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "worrying"]].replace([np.inf, -np.inf], np.nan)
-X_report_citizenship = X_report_citizenship.fillna(X_report_citizenship.mean())
+X_report_citizenship = df_model_1[["age", "interest", "citizenship", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "worrying"]]
+X_report_citizenship = X_report_citizenship.fillna(X_report_citizenship.median())
 X_report_citizenship = sm.add_constant(X_report_citizenship, has_constant= "add")
 
 #Model construction 1 - Reporting content as DV
@@ -475,8 +470,8 @@ y=df_model_1["reported_content_dummy"]
 regression_report_citizenship = sm.Logit(y, X_report_citizenship).fit()
 regression_citizenship.append(regression_report_citizenship)
 
-X_rights_citizenship = df_model_2[["age", "interest", "citizenship", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "worrying"]].replace([np.inf, -np.inf], np.nan)
-X_rights_citizenship = X_rights_citizenship.fillna(X_rights_citizenship.mean())
+X_rights_citizenship = df_model_2[["age", "interest", "citizenship", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "worrying"]]
+X_rights_citizenship = X_rights_citizenship.fillna(X_rights_citizenship.median())
 X_rights_citizenship = sm.add_constant(X_rights_citizenship, has_constant= "add")
 
 #Model construction 2 - Used rights as DV
@@ -488,12 +483,31 @@ stargazer = Stargazer(regression_citizenship)
 with open(path_reg / "Main Model - Citizenship.txt", "w", encoding = "utf-8") as f:
     f.write(stargazer.render_latex(stargazer))
 
+#############################
+#Main Model - strictly reporting using the NaAM
+#############################
+###Model without interaction term - creating predictor variables, filling nan with 
+X_report_strict = df_model_1[["age", "interest", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "worrying"]].replace([np.inf, -np.inf], np.nan)
+X_report_strict = X_report_strict.fillna(X_report_strict.median())
+X_report_strict = sm.add_constant(X_report_strict, has_constant= "add")
+
+#Model construction 1 - Reporting content as DV
+regression_strict = []
+y=df_model_1["reported_content_dummy_naam"]
+regression_report_strict = sm.Logit(y, X_report_strict).fit()
+regression_strict.append(regression_report_strict)
+
+stargazer = Stargazer(regression_strict)
+with open(path_reg / "Main Model - Strict NaAM.txt", "w", encoding = "utf-8") as f:
+    f.write(stargazer.render_latex(stargazer))
+
+
 ##############################################
 ###Extended Model - with interaction term
 ##############################################
 #Model creation - incl. interaction term
 X_report_interaction = df_model_1[["age", "interest", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "interaction_term", "worrying"]].replace([np.inf, -np.inf], np.nan)
-X_report_interaction = X_report_interaction.fillna(X_report_interaction.mean())
+X_report_interaction = X_report_interaction.fillna(X_report_interaction.median())
 X_report_interaction = sm.add_constant(X_report_interaction, has_constant= "add")
 
 #Model creation 1- Reporting content as dependent variable
@@ -503,7 +517,7 @@ model2_report = sm.Logit(y, X_report_interaction).fit()
 regression_interaction.append(model2_report)
 
 X_rights_interaction = df_model_2[["age", "interest", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "interaction_term", "worrying"]].replace([np.inf, -np.inf], np.nan)
-X_rights_interaction = X_rights_interaction.fillna(X_rights_interaction.mean())
+X_rights_interaction = X_rights_interaction.fillna(X_rights_interaction.median())
 X_rights_interaction = sm.add_constant(X_rights_interaction, has_constant= "add")
 
 #Model creation 2 - Used rights as dependent variable
@@ -520,7 +534,7 @@ with open(path_reg / "Logistic regression - Extended Model.txt", "w", encoding =
 ###Baseline-Model - less IVs
 ##############################################
 X_report_reduced = df_model_1[["age", "interest", "use_time_micro", "knowledge_dsa_centered", "worrying"]].replace([np.inf, -np.inf], np.nan)
-X_report_reduced = X_report_reduced.fillna(X_report_reduced.mean())
+X_report_reduced = X_report_reduced.fillna(X_report_reduced.median())
 X_report_reduced = sm.add_constant(X_report_reduced, has_constant= "add")
 
 #Reporting content as dependent variable
@@ -530,7 +544,7 @@ regression_reduced_report = sm.Logit(y, X_report_reduced).fit()
 regression_reduced.append(regression_reduced_report)
 
 X_rights_reduced = df_model_2[["age", "interest", "use_time_micro", "knowledge_dsa_centered", "worrying"]].replace([np.inf, -np.inf], np.nan)
-X_rights_reduced = X_rights_reduced.fillna(X_rights_reduced.mean())
+X_rights_reduced = X_rights_reduced.fillna(X_rights_reduced.median())
 X_rights_reduced = sm.add_constant(X_rights_reduced, has_constant= "add")
 
 #Model creation 2 - Used rights as dependent variable
@@ -547,7 +561,7 @@ with open(path_reg / "Logistic regression - Reduced model.txt", "w", encoding = 
 #############################
 ###Model without interaction term - creating predictor variables, filling nan with 
 X_report_improving = df_model_1[["age", "interest", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "improving_protection"]].replace([np.inf, -np.inf], np.nan)
-X_report_improving = X_report_improving.fillna(X_report_improving.mean())
+X_report_improving = X_report_improving.fillna(X_report_improving.median())
 X_report_improving = sm.add_constant(X_report_improving, has_constant= "add")
 
 #Model construction 1 - Reporting content as dependent variable
@@ -557,7 +571,7 @@ regression_improving_report = sm.Logit(y, X_report_improving).fit()
 regression_improving.append(regression_improving_report)
 
 X_rights_improving = df_model_2[["age", "interest", "shaping_space", "use_time_micro", "trust_average_centered", "knowledge_dsa_centered", "improving_protection"]].replace([np.inf, -np.inf], np.nan)
-X_rights_improving = X_rights_improving.fillna(X_rights_improving.mean())
+X_rights_improving = X_rights_improving.fillna(X_rights_improving.median())
 X_rights_improving = sm.add_constant(X_rights_improving, has_constant= "add")
 
 #Model construction 2 - Used rights as dependent variable
@@ -655,7 +669,7 @@ crosstable_reporting_knowledge = pd.crosstab(df["knowledge_dsa_label"], df["repo
 latex(path_desc, "Reporting knowledge crosstable.txt", crosstable_reporting_knowledge)
 
 #Crosstable between dummy variable for having used a right under the DSA and seen illegal content
-crosstab_rights_seen = pd.crosstab(df_used_rights_dummy["used_rights_dummy"], df_seen_content_dummy["seen_content_dummy"])
+crosstab_rights_seen = pd.crosstab(df_model_2["used_rights_dummy"], df_model_2["seen_content_dummy"])
 print(crosstab_rights_seen)
 latex(path_desc, "crosstable used rights & seen content.txt", crosstab_rights_seen)
 
@@ -675,8 +689,8 @@ df_seen_reported_content = df[df["seen_content_dummy"] == 1]
 print(f"correlation between interest and using rights: {df[["used_rights_dummy", "interest"]].corr()}")
 print(f"Share of people who reported content upon seeing illegal content: {(df_seen_reported_content["reported_content_dummy"].sum())/len(df_seen_reported_content)}")
 print(f"Median duration: {df["Duration (in seconds)"].median()}")
-print(len(df_used_rights_dummy))
-print(f"Number of people who used more than 1 right: {df_used_rights_dummy["used_rights"].astype(str).str.contains(',').sum()}")
+print(len(df_model_2))
+print(f"Number of people who used more than 1 right: {df_model_2["used_rights"].astype(str).str.contains(',').sum()}")
 
 '''
 ###TESTSITE

@@ -38,6 +38,9 @@ for col in numeric_cols:
 #Creating dummy variables
 df_rename["reported_content_dummy"] = df_rename["reported_content"].isin([1, 3]).astype(int)
 df_rename.loc[df_rename["reported_content"] == -3, "reported_content_dummy"] = np.nan #setting "prefer not to answer" to none to be not labelled as "No"
+#Adding a dummy for those who explicitly indicated using the Notice and Action Mechanism
+df_rename["reported_content_dummy_naam"] = df_rename["reported_content"].isin([1]).astype(int)
+df_rename.loc[df_rename["reported_content"] == -3, "reported_content_dummy_naam"] = np.nan #setting "prefer not to answer" to none to be not labelled as "No"
 df_rename["used_rights_dummy"] = df_rename["used_rights"].astype(str).isin(["-3", "8"]).astype(int)
 df_rename.loc[df_rename["used_rights"] == -3, "used_rights_dummy"] = np.nan
 df_rename["seen_content_dummy"] = df_rename["seen_content"].astype(str).isin(["-3", "1"]).astype(int)
